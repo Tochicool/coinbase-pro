@@ -7,6 +7,8 @@ module CoinbasePro.Authenticated.Orders
   , Order (..)
   , STP (..)
   , TimeInForce (..)
+  , Stop (..)
+  , CancelAfter (..)
   , PlaceOrderBody (..)
 
   , statuses
@@ -24,7 +26,8 @@ import           Data.Text         (pack, toLower, unpack)
 import           Web.HttpApiData   (ToHttpApiData (..))
 
 import           CoinbasePro.Types (CreatedAt, OrderId, OrderType, Price,
-                                    ProductId, Side, Size, filterOrderFieldName)
+                                    ProductId, Side, Size, filterOrderFieldName,
+                                    Funds)
 
 
 -- TODO: All is not a status
@@ -63,9 +66,30 @@ instance ToHttpApiData STP where
     toQueryParam = toLower . pack . show
 
 
+data Stop = Loss | Entry
+    deriving (Eq, Ord, Show)
+
+
+instance ToHttpApiData Stop where
+    toUrlPiece   = toLower . pack . show
+    toQueryParam = toLower . pack . show
+    
+
+data CancelAfter = Min | Hour | Day
+    deriving (Eq, Ord, Show)
+
+
+instance ToHttpApiData CancelAfter where
+    toUrlPiece   = toLower . pack . show
+    toQueryParam = toLower . pack . show
+
+
 deriveJSON defaultOptions {constructorTagModifier = fmap Char.toLower} ''Status
 deriveJSON defaultOptions ''TimeInForce
 deriveJSON defaultOptions {constructorTagModifier = fmap Char.toLower} ''STP
+deriveJSON defaultOptions {constructorTagModifier = fmap Char.toLower} ''Stop
+deriveJSON defaultOptions {constructorTagModifier = fmap Char.toLower} 
+    ''CancelAfter
 
 
 newtype FillFees = FillFees { unFillFees :: Double }
@@ -106,19 +130,28 @@ data Order = Order
     } deriving (Eq, Show)
 
 
-deriveJSON defaultOptions {fieldLabelModifier = filterOrderFieldName . snakeCase} ''Order
+deriveJSON defaultOptions
+    {fieldLabelModifier = filterOrderFieldName . snakeCase} ''Order
 
 
 data PlaceOrderBody = PlaceOrderBody
-    { bProductId :: ProductId
-    , bSide      :: Side
-    , bSize      :: Size
-    , bPrice     :: Price
-    , bPostOnly  :: Bool
-    , bOrderType :: Maybe OrderType
-    , bStp       :: Maybe STP
-    , bTif       :: Maybe TimeInForce
+    { bClientOid   :: Maybe OrderId
+    , bOrderType   :: Maybe OrderType
+    , bSide        :: Side
+    , bProductId   :: ProductId
+    , bStp         :: Maybe STP
+    , bStop        :: Maybe Stop
+    , bStopPrice   :: Maybe Price
+    , bPrice       :: Maybe Price
+    , bSize        :: Maybe Size
+    , bTif         :: Maybe TimeInForce
+    , bCancelAfter :: Maybe CancelAfter
+    , bPostOnly    :: Maybe Bool
+    , bFunds     :: Maybe Funds
     } deriving (Eq, Show)
 
 
-deriveJSON defaultOptions {fieldLabelModifier = snakeCase . drop 1, omitNothingFields = True} ''PlaceOrderBody
+deriveJSON
+    defaultOptions 
+    { fieldLabelModifier = filterOrderFieldName . snakeCase . drop 1
+    , omitNothingFields = True} ''PlaceOrderBody

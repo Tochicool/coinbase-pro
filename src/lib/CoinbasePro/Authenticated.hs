@@ -7,6 +7,8 @@ module CoinbasePro.Authenticated
   , account
   , listOrders
   , placeOrder
+  , placeLimitOrder
+  , placeMarketOrder
   , cancelOrder
   , cancelAll
   , fills
@@ -37,14 +39,16 @@ import           CoinbasePro.Authenticated.Fills    (Fill)
 import           CoinbasePro.Authenticated.Orders   (Order, PlaceOrderBody (..),
                                                      STP, Status (..),
                                                      Statuses (..), TimeInForce,
-                                                     statuses)
+                                                     Stop, statuses,
+                                                     CancelAfter)
 import           CoinbasePro.Authenticated.Request  (CBAuthT (..), authRequest)
 import           CoinbasePro.Request                (RequestPath)
 
 
-import           CoinbasePro.Types                  (OrderId (..), OrderType,
-                                                     Price, ProductId (..),
-                                                     Side, Size)
+import           CoinbasePro.Types                  (OrderId (..),
+                                                     OrderType(..), Price, 
+                                                     ProductId (..), Side, Size,
+                                                     Funds)
 
 
 -- | https://docs.pro.coinbase.com/?javascript#accounts
@@ -76,13 +80,32 @@ listOrders st prid = authRequest methodGet (mkRequestPath "/orders") "" $ API.li
     defaultStatus = fromMaybe [All]
 
 
+{-# DEPRECATED placeOrder "Use `placeLimitOrder` or `placeMarketOrder` instead" #-}
 -- | https://docs.pro.coinbase.com/?javascript#place-a-new-order
 placeOrder :: ProductId -> Side -> Size -> Price -> Bool -> Maybe OrderType -> Maybe STP -> Maybe TimeInForce -> CBAuthT ClientM Order
 placeOrder prid sd sz price po ot stp tif =
     authRequest methodPost "/orders" (LC8.unpack $ encode body) $ API.placeOrder body
   where
-    body = PlaceOrderBody prid sd sz price po ot stp tif
+    body = PlaceOrderBody Nothing ot sd prid stp Nothing Nothing (Just price) 
+        (Just sz) tif Nothing (Just po) Nothing
 
+
+-- | https://docs.pro.coinbase.com/?javascript#place-a-new-order
+placeLimitOrder :: Side -> ProductId -> Price -> Maybe OrderId -> Maybe STP -> Maybe Stop -> Maybe Price -> Maybe Size -> Maybe TimeInForce -> Maybe CancelAfter -> Maybe Bool -> CBAuthT ClientM Order
+placeLimitOrder sd prid price coid stp stop stopPrice sz tif ca po =
+    authRequest methodPost "/orders" (LC8.unpack $ encode body) $ API.placeOrder body
+  where
+    body = PlaceOrderBody coid (Just Limit) sd prid stp stop stopPrice 
+        (Just price) sz tif ca po Nothing
+
+
+-- | https://docs.pro.coinbase.com/?javascript#place-a-new-order
+placeMarketOrder :: Side -> ProductId -> Maybe OrderId -> Maybe STP -> Maybe Stop -> Maybe Price -> Maybe Size -> Maybe Funds -> CBAuthT ClientM Order
+placeMarketOrder sd prid coid stp stop stopPrice sz funds =
+    authRequest methodPost "/orders" (LC8.unpack $ encode body) $ API.placeOrder body
+  where
+    body = PlaceOrderBody coid (Just Market) sd prid stp stop stopPrice Nothing
+     sz Nothing Nothing Nothing funds
 
 -- | https://docs.pro.coinbase.com/?javascript#cancel-an-order
 cancelOrder :: OrderId -> CBAuthT ClientM ()
