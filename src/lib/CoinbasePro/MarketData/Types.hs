@@ -27,6 +27,8 @@ data Product = Product
     , baseMinSize    :: Double
     , baseMaxSize    :: Double
     , quoteIncrement :: Double
+    , minMarketFunds :: Double
+    , maxMarketFunds :: Double
     } deriving (Eq, Show)
 
 
@@ -38,7 +40,10 @@ instance FromJSON Product where
         bmins <- o .: "base_min_size"
         bmaxs <- o .: "base_max_size"
         qi    <- o .: "quote_increment"
-        return $ Product prid bc qc (read bmins) (read bmaxs) (read qi)
+        minmf <- o .: "min_market_funds"
+        maxmf <- o .: "max_market_funds"
+        return $ Product prid bc qc (read bmins) (read bmaxs) (read qi) 
+            (read minmf) (read maxmf)
 
 
 instance ToHttpApiData Product where
